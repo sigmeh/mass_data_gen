@@ -26,9 +26,11 @@ Usage:
 '''
 
 import numpy as np
+import json
 
 isotope_data_fields = ['atomic_num','symbol','mass_num','mass','abundance','std_atomic_weight']
-element_data_fields = ['atomic_num','symbol','mass_num','std_atomic_weight']
+element_data_fields = ['atomic_num','symbol','std_atomic_weight']
+#element_data_fields = ['atomic_num','symbol','mass_num','std_atomic_weight']
 
 elements = {}
 
@@ -74,13 +76,24 @@ def process( all_isotope_data ):
 		if e.abundances:
 			e.atomic_weight = sum( np.array(e.masses) * np.array(e.abundances) ) 
 		else:
-			e.atomic_weight = None
+			e.atomic_weight = e.std_atomic_weight.split('(')[0]
 
+
+def write_json( elements ):
+	''' json-encode element data for export '''
+
+	el_json = { e : { x : getattr(elements[e],x) for x in elements[e].__dict__ } for e in elements}
+	
+	with open('elements.json','w') as f:
+		f.write( json.dumps( el_json ) )
+	
 
 def main():
 
 	with open('NIST_isotope_data_2017.txt') as f:
 		process( [x.split('\n') for x in f.read().split('\n\n')] )
+	
+	write_json( elements )
 		
 	return elements
 	
