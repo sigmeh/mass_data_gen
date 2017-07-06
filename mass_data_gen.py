@@ -27,10 +27,11 @@ Usage:
 
 import numpy as np
 import json
+import re
 
-isotope_data_fields = ['atomic_num','symbol','mass_num','mass','abundance','std_atomic_weight']
-element_data_fields = ['atomic_num','symbol','std_atomic_weight']
-#element_data_fields = ['atomic_num','symbol','mass_num','std_atomic_weight']
+isotope_data_fields 		= ['atomic_num','symbol','mass_num','mass','abundance','std_atomic_weight']
+isotope_data_map			= [int, str, int, float, lambda x: float(x) if x else None, lambda x: x]
+element_data_fields 		= ['atomic_num','symbol','std_atomic_weight']
 
 elements = {}
 
@@ -38,7 +39,8 @@ class isotope(object):
 	'''Each NIST data entry is an isotope, used collectively to build elements from element() object'''
 	def __init__(self, isotope_data):
 		for i,f in enumerate(isotope_data_fields):
-			setattr(self, f, isotope_data[i].split('=')[1].strip())
+			val = isotope_data[i].split('=')[1].strip().split('(')[0]
+			setattr(self, f, isotope_data_map[i](val) )
 		if self.symbol in 'TD':
 			self.symbol = 'H'
 
@@ -50,39 +52,45 @@ class element(object):
 			setattr(self, i, getattr(isotope_obj, i))		
 		self.masses 	= []
 		self.abundances = []
+		self.isotopes 	= []
 		
 		self.add_mass(isotope_obj)
 
 	def add_mass(self, isotope_obj):
+		self.isotopes.append(isotope_obj)
 		if isotope_obj.abundance:
-			self.masses.append( 	round( float( isotope_obj.mass.split('(')[0] ), 5 ) )
-			self.abundances.append( round( float( isotope_obj.abundance.split('(')[0] ), 5 ) )
+			self.abundances.append( round( float( isotope_obj.abundance ), 5 ) )
+			self.masses.append( 	round( float( isotope_obj.mass 		), 5 ) )
 
 
 def process( all_isotope_data ):
 	''' data is list of individual isotope lists, read from nist_el_data_linear.txt '''
-
 	for isotope_data in all_isotope_data:		
 		isotope_obj = isotope( isotope_data )
-		
+
 		if isotope_obj.symbol not in elements:
 			elements[isotope_obj.symbol] = element(isotope_obj)	
 		else:
 			elements[isotope_obj.symbol].add_mass(isotope_obj)
 	
 	''' After the creation of all elements, get atomic weight from masses/abundances data '''
-	for el in elements:
-		e = elements[el]
-		if e.abundances:
-			e.atomic_weight = sum( np.array(e.masses) * np.array(e.abundances) ) 
+	for elem in elements:
+		el = elements[elem]
+		if el.abundances:
+			el.atomic_weight = sum( np.array(el.masses) * np.array(el.abundances) ) 
 		else:
-			e.atomic_weight = e.std_atomic_weight.split('(')[0]
+			mass_num_weight = re.sub('\[|\]','', el.std_atomic_weight) 	#if no abundances are recorded, attempt to extract common isotope from std_atomic_weight
+			iso_masses = [iso.mass for iso in el.isotopes]
+			mass_diff_map = map( lambda x: abs( float(mass_num_weight) - x ) if mass_num_weight else x, iso_masses)# [ iso.mass for iso in el.isotopes ] )
+			sorted_mass_map = [x for y,x in sorted(zip( mass_diff_map, iso_masses ))]
+			
+			el.atomic_weight = sorted_mass_map[0] if any([x < 1. for x in mass_diff_map]) else 'Unknown'
 
 
 def write_json( elements ):
 	''' json-encode element data for export '''
 
-	el_json = { e : { x : getattr(elements[e],x) for x in elements[e].__dict__ } for e in elements}
+	el_json = { e : { x : getattr(elements[e],x) for x in elements[e].__dict__  if x != 'isotopes'} for e in elements}
 	
 	with open('elements.json','w') as f:
 		f.write( json.dumps( el_json ) )
@@ -94,6 +102,8 @@ def main():
 		process( [x.split('\n') for x in f.read().split('\n\n')] )
 	
 	write_json( elements )
+	print elements['H'].__dict__	
+		
 		
 	return elements
 	
