@@ -79,7 +79,10 @@ def process( all_isotope_data ):
 		if el.abundances:
 			el.atomic_weight = sum( np.array(el.masses) * np.array(el.abundances) ) 
 		else:
-			mass_num_weight = re.sub('\[|\]','', el.std_atomic_weight) 	#if no abundances are recorded, attempt to extract common isotope from std_atomic_weight
+			''' Attempt to extract atomic_weight from std_atomic_weight field
+				Subtract weight (if available) from each isotope mass and sort the absolute difference
+				Add the lowest value (after sorting) if the mass_diff_map has values < 1 '''
+			mass_num_weight = re.sub('\[|\]','', el.std_atomic_weight) 
 			iso_masses = [iso.mass for iso in el.isotopes]
 			mass_diff_map = map( lambda x: abs( float(mass_num_weight) - x ) if mass_num_weight else x, iso_masses)# [ iso.mass for iso in el.isotopes ] )
 			sorted_mass_map = [x for y,x in sorted(zip( mass_diff_map, iso_masses ))]
@@ -102,8 +105,6 @@ def main():
 		process( [x.split('\n') for x in f.read().split('\n\n')] )
 	
 	write_json( elements )
-	print elements['H'].__dict__	
-		
 		
 	return elements
 	
