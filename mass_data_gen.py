@@ -93,10 +93,14 @@ def process( all_isotope_data ):
 def write_json( elements ):
 	''' json-encode element data for export '''
 
-	el_json = { e : { x : getattr(elements[e],x) for x in elements[e].__dict__  if x != 'isotopes'} for e in elements}
+	elements_json = { e : { x : getattr(elements[e],x) for x in elements[e].__dict__  if x != 'isotopes'} for e in elements}	
+	elements_ordered = [elements_json[e] for e in sorted([el for el in elements_json], key = lambda x: elements_json[x]['atomic_num'])]
 	
-	with open('elements.json','w') as f:
-		f.write( json.dumps( el_json ) )
+	with open('elements_ordered.json','w') as f:
+		f.write( json.dumps( elements_ordered ) )
+	
+	#with open('elements.json','w') as f:
+	#	f.write( json.dumps( el_json ) )
 	
 
 def main():
