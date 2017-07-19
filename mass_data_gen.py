@@ -75,6 +75,7 @@ def process( all_isotope_data ):
 	
 	''' After the creation of all elements, get atomic weight from masses/abundances data '''
 	for elem in elements:
+		
 		el = elements[elem]
 		if el.abundances:
 			el.atomic_weight = sum( np.array(el.masses) * np.array(el.abundances) ) 
@@ -82,12 +83,18 @@ def process( all_isotope_data ):
 			''' Attempt to extract atomic_weight from std_atomic_weight field
 				Subtract weight (if available) from each isotope mass and sort the absolute difference
 				Add the lowest value (after sorting) if the mass_diff_map has values < 1 '''
+			
+				
+			if not el.std_atomic_weight: 
+				el.atomic_weight = '[]'
+				continue
+			
 			mass_num_weight = re.sub('\[|\]','', el.std_atomic_weight) 
 			iso_masses = [iso.mass for iso in el.isotopes]
 			mass_diff_map = map( lambda x: abs( float(mass_num_weight) - x ) if mass_num_weight else x, iso_masses)# [ iso.mass for iso in el.isotopes ] )
 			sorted_mass_map = [x for y,x in sorted(zip( mass_diff_map, iso_masses ))]
 			
-			el.atomic_weight = sorted_mass_map[0] if any([x < 1. for x in mass_diff_map]) else 'Unknown'
+			el.atomic_weight = sorted_mass_map[0] if any([x < 1. for x in mass_diff_map]) else '[]'
 
 
 def write_json( elements ):
@@ -96,11 +103,11 @@ def write_json( elements ):
 	elements_json = { e : { x : getattr(elements[e],x) for x in elements[e].__dict__  if x != 'isotopes'} for e in elements}	
 	elements_ordered = [elements_json[e] for e in sorted([el for el in elements_json], key = lambda x: elements_json[x]['atomic_num'])]
 	
-	with open('elements_ordered.json','w') as f:
-		f.write( json.dumps( elements_ordered ) )
+	with open('elements_list.json','w') as f:
+		f.write( 'var elements_list = ' + json.dumps( elements_ordered ) )
 	
-	#with open('elements.json','w') as f:
-	#	f.write( json.dumps( el_json ) )
+	with open('elements.json','w') as f:
+		f.write( 'var elements = ' + json.dumps( elements_json ) )
 	
 
 def main():
@@ -109,7 +116,7 @@ def main():
 		process( [x.split('\n') for x in f.read().split('\n\n')] )
 	
 	write_json( elements )
-		
+	
 	return elements
 	
 if __name__ == '__main__':
